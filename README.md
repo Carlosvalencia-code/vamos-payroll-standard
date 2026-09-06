@@ -22,6 +22,27 @@ En el mercado peruano, las soluciones de nómina y recursos humanos presentan tr
 
 ---
 
+## 📸 Evidencia Visual y Arquitectura en Funcionamiento
+
+### 1. Dashboard Ejecutivo de Nómina y Exportación SUNAT PLAME
+Visualización consolidada de conceptos remunerativos, cálculo automático de retenciones ONP/AFP y descarga inmediata de los archivos planos oficiales `.rem`, `.jor` y `.snl`.
+
+![Dashboard de Nómina](docs/screenshots/dashboard_preview.png)
+
+### 2. Boleta de Pago Oficial A4 (Normativa MTPE D.S. 001-98-TR)
+Generación instantánea con formato de 3 columnas (Ingresos, Descuentos, Aportes Patronales), desglose de horas extras, texto de moneda legal en letras en Soles y hash de verificación SHA-256 no sensible.
+
+<div align="center">
+  <img src="docs/screenshots/boleta_preview.png" alt="Boleta de Pago Oficial A4" width="75%" />
+</div>
+
+### 3. Terminal Kiosco de Asistencia Offline-First
+Terminal de marcación para tablet en piso de almacén con teclado PIN y encadenamiento criptográfico SHA-256 inmutable sobre SQLite nativo (prevención de fraude ante inspecciones inopinadas de SUNAFIL).
+
+![Terminal Kiosco Almacén](docs/screenshots/kiosk_preview.png)
+
+---
+
 ## 🏛️ Marco Normativo y de Seguridad Implementado
 
 | Dominio | Base Legal / Estándar | Implementación en Código |

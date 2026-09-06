@@ -521,11 +521,17 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
   <script>
     let currentPin = '';
 
-    function switchTab(tabId) {
+    function switchTab(tabId, btn) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-      event.target.classList.add('active');
+      const content = document.getElementById(tabId);
+      if (content) content.classList.add('active');
+      if (btn) {
+        btn.classList.add('active');
+      } else {
+        const matchingBtn = document.querySelector('button[onclick*="' + tabId + '"]');
+        if (matchingBtn) matchingBtn.classList.add('active');
+      }
     }
 
     async function loadPayroll() {
@@ -634,6 +640,12 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     // Inicializar
     loadPayroll();
     loadKioskEvents();
+    if (window.location.hash) {
+      const targetTab = window.location.hash.replace('#', '');
+      if (document.getElementById(targetTab)) {
+        switchTab(targetTab);
+      }
+    }
   </script>
 </body>
 </html>`;
