@@ -1,0 +1,21 @@
+{
+  "name": "@payroll/plame-compiler",
+  "version": "0.1.0",
+  "description": "Compilador y validador de archivos planos para PDT-PLAME v4.5 (.rem, .jor, .snl) y AFPnet según especificación oficial de SUNAT",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --experimental-strip-types tests/**/*.test.ts"
+  },
+  "keywords": [
+    "plame",
+    "sunat",
+    "peru",
+    "rem",
+    "jor",
+    "snl",
+    "afpnet"
+  ],
+  "author": "VAMOS Core Team",
+  "license": "AGPL-3.0-only"
+}

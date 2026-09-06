@@ -1,0 +1,18 @@
+{
+  "name": "@payroll/engine",
+  "version": "0.1.0",
+  "description": "Motor de cálculo puro de nómina para legislación laboral peruana (Pequeña Empresa D.L. 1086 y Régimen General D.L. 728)",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --experimental-strip-types tests/**/*.test.ts"
+  },
+  "keywords": [
+    "payroll-engine",
+    "peru",
+    "mype",
+    "dl728"
+  ],
+  "author": "VAMOS Core Team",
+  "license": "AGPL-3.0-only"
+}
