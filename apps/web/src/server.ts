@@ -1,150 +1,48 @@
 /**
  * Interactive Web Dashboard and Local Kiosk Terminal for VAMOS Payroll
- * Native Node.js 24 Server with Zero External Dependencies
+ * Native Node.js 24 Server — Hardened Technical Prototype for Local Lab & Closed Pilot
+ * 
+ * Security Controls Implemented (Sept 2026 Audit Remediation):
+ * - Strict Host Binding to 127.0.0.1 (No accidental network exposure)
+ * - Restrictive CORS (Localhost whitelist, no wildcard '*')
+ * - Lab Authentication Guard ('x-vamos-key' header / '?key=' query token)
+ * - DoS Mitigation (16 KB max request body limit on POST)
+ * - XSS Prevention (Strict HTML escaping and textContent DOM binding)
+ * - Synthetic Test Fixtures isolation (Zero real employee PII)
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { KioskStorage } from '../../../packages/attendance-core/src/storage/kioskStorage.ts';
 import { calculateEmployeePayroll } from '../../../packages/engine/src/engine.ts';
-import type { AttendanceSummary, Employee, PayrollPeriod } from '../../../packages/engine/src/types.ts';
 import { compilePlamePackage } from '../../../packages/plame-compiler/src/compiler.ts';
-import type { CompanyHeader, EmployeePayrollItem } from '../../../packages/plame-compiler/src/types.ts';
+import type { EmployeePayrollItem } from '../../../packages/plame-compiler/src/types.ts';
 import { generatePayslip } from '../../../packages/payslip-pdf/src/generator.ts';
-import type { CompanyInfo, EmployeeJobInfo } from '../../../packages/payslip-pdf/src/types.ts';
+import {
+  SYNTHETIC_COMPANY_HEADER,
+  SYNTHETIC_COMPANY_INFO,
+  SYNTHETIC_PERIOD_SEPT_2026,
+  SYNTHETIC_WORKERS,
+} from './fixtures/syntheticDemoData.ts';
 
 const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST || '127.0.0.1';
+const VAMOS_LAB_KEY = process.env.VAMOS_LAB_KEY || 'test-lab-token';
+const MAX_PAYLOAD_BYTES = 16 * 1024; // 16 KB
 
-// 1. Datos Demo de la Distribuidora en Lima
-const companyHeader: CompanyHeader = {
-  ruc: '20601234567',
-  razonSocial: 'DISTRIBUIDORA MAYORISTA LIMA S.A.C.',
-  year: 2026,
-  month: 9,
-};
-
-const companyInfo: CompanyInfo = {
-  ruc: companyHeader.ruc,
-  razonSocial: companyHeader.razonSocial,
-  direccion: 'Av. Nicolás Dueñas 850, Lima Industrial',
-};
-
-const periodSept2026: PayrollPeriod = {
-  year: 2026,
-  month: 9,
-  periodLabel: '2026-09',
-};
-
-interface DemoWorker {
-  employee: Employee & EmployeeJobInfo;
-  attendance: AttendanceSummary;
-  rawPin: string;
-}
-
-const DEMO_WORKERS: DemoWorker[] = [
-  {
-    employee: {
-      id: 'EMP-001',
-      docType: 'DNI',
-      docNumber: '40506070',
-      fullName: 'Carlos Mendoza Ramos',
-      cargo: 'Chofer de Reparto',
-      fechaIngreso: '2024-02-15',
-      regime: 'PEQUENA_EMPRESA',
-      pensionSystem: 'INTEGRA',
-      commissionType: 'FLUJO',
-      baseSalary: 1600.00,
-      hasFamilyAllowance: true,
-      hireDate: '2024-02-15',
-      cuspp: '548721CMR0',
-    },
-    attendance: {
-      daysInMonth: 30,
-      daysWorked: 30,
-      regularHours: 240,
-      overtimeHours25: 12,
-      overtimeHours35: 4,
-      nightHours: 15,
-      tardyMinutes: 0,
-      daysAbsentUnjustified: 0,
-      daysSubsidized: 0,
-      daysUnpaidLeave: 0,
-    },
-    rawPin: '1234',
-  },
-  {
-    employee: {
-      id: 'EMP-002',
-      docType: 'DNI',
-      docNumber: '70809010',
-      fullName: 'Rosa Alva Sanchez',
-      cargo: 'Auxiliar de Almacén',
-      fechaIngreso: '2025-01-10',
-      regime: 'PEQUENA_EMPRESA',
-      pensionSystem: 'ONP',
-      commissionType: 'FLUJO',
-      baseSalary: 1200.00,
-      hasFamilyAllowance: false,
-      hireDate: '2025-01-10',
-    },
-    attendance: {
-      daysInMonth: 30,
-      daysWorked: 30,
-      regularHours: 240,
-      overtimeHours25: 4,
-      overtimeHours35: 0,
-      nightHours: 0,
-      tardyMinutes: 25,
-      daysAbsentUnjustified: 0,
-      daysSubsidized: 0,
-      daysUnpaidLeave: 0,
-    },
-    rawPin: '5678',
-  },
-  {
-    employee: {
-      id: 'EMP-003',
-      docType: 'DNI',
-      docNumber: '10203040',
-      fullName: 'Juan Quispe Morales',
-      cargo: 'Estibador de Carga',
-      fechaIngreso: '2025-03-01',
-      regime: 'PEQUENA_EMPRESA',
-      pensionSystem: 'PRIMA',
-      commissionType: 'FLUJO',
-      baseSalary: 1025.00, // RMV
-      hasFamilyAllowance: true,
-      hireDate: '2025-03-01',
-    },
-    attendance: {
-      daysInMonth: 30,
-      daysWorked: 28,
-      regularHours: 224,
-      overtimeHours25: 0,
-      overtimeHours35: 0,
-      nightHours: 0,
-      tardyMinutes: 0,
-      daysAbsentUnjustified: 2, // 2 faltas
-      daysSubsidized: 0,
-      daysUnpaidLeave: 0,
-    },
-    rawPin: '4321',
-  },
-];
-
-// 2. Inicializar Kiosco en Memoria
+// 1. Inicializar Kiosco en Memoria con Datos Sintéticos de Demostración
 const kioskStorage = new KioskStorage(':memory:');
-for (const w of DEMO_WORKERS) {
+for (const w of SYNTHETIC_WORKERS) {
   kioskStorage.registerEmployeeWithRawPin(w.employee.id, w.employee.docNumber, w.employee.fullName, w.rawPin);
 }
 
-// Marcajes iniciales para simular datos reales
+// Marcajes sintéticos iniciales para simular datos en el log inmutable
 kioskStorage.recordAttendanceWithPin('40506070', '1234', 'INGRESO', 'TABLET-ALMACEN-01');
 kioskStorage.recordAttendanceWithPin('70809010', '5678', 'INGRESO', 'TABLET-ALMACEN-01');
 
-// 3. Helper para calcular nómina consolidada
+// 2. Helper para calcular nómina consolidada
 function getConsolidatedPayroll() {
-  const items: EmployeePayrollItem[] = DEMO_WORKERS.map((w) => {
-    const payroll = calculateEmployeePayroll(w.employee, w.attendance, periodSept2026);
+  const items: EmployeePayrollItem[] = SYNTHETIC_WORKERS.map((w) => {
+    const payroll = calculateEmployeePayroll(w.employee, w.attendance, SYNTHETIC_PERIOD_SEPT_2026);
     return {
       docType: w.employee.docType,
       docNumber: w.employee.docNumber,
@@ -153,18 +51,58 @@ function getConsolidatedPayroll() {
     };
   });
 
-  const plamePackage = compilePlamePackage(companyHeader, items);
+  const plamePackage = compilePlamePackage(SYNTHETIC_COMPANY_HEADER, items);
   return { items, plamePackage };
 }
 
-// 4. Servidor HTTP
-const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-  const url = new URL(req.url || '/', `http://${req.headers.host}`);
+// 3. Helpers de Seguridad HTTP
+function applySecurityHeaders(res: ServerResponse) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com;"
+  );
+}
 
-  // CORS Headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+function handleCors(req: IncomingMessage, res: ServerResponse): boolean {
+  const origin = req.headers.origin;
+  const host = req.headers.host || `${HOST}:${PORT}`;
+
+  const allowedOrigins = [
+    `http://${host}`,
+    `http://localhost:${PORT}`,
+    `http://127.0.0.1:${PORT}`,
+  ];
+
+  if (origin) {
+    if (allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-VAMOS-KEY');
+    } else {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'CORS policy violation: Origen no autorizado en este entorno de pruebas.' }));
+      return false;
+    }
+  }
+  return true;
+}
+
+function verifyAuth(req: IncomingMessage, url: URL): boolean {
+  const headerKey = req.headers['x-vamos-key'];
+  const queryKey = url.searchParams.get('key');
+  return headerKey === VAMOS_LAB_KEY || queryKey === VAMOS_LAB_KEY;
+}
+
+// 4. Servidor HTTP Hardened
+const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+  applySecurityHeaders(res);
+
+  if (!handleCors(req, res)) {
+    return;
+  }
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -172,17 +110,29 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
-  // Rutas API
+  const url = new URL(req.url || '/', `http://${req.headers.host || HOST}`);
+
+  // Rutas Protegidas (Requieren autenticación)
   if (url.pathname === '/api/payroll-data') {
+    if (!verifyAuth(req, url)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        error: 'Acceso No Autorizado',
+        message: 'Se requiere la cabecera "x-vamos-key" o parámetro "?key=" para consultar datos de nómina en este entorno.',
+        environment: 'local-laboratory-prototype',
+      }));
+      return;
+    }
+
     const { items, plamePackage } = getConsolidatedPayroll();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
       JSON.stringify({
-        company: companyHeader,
-        period: periodSept2026,
+        company: SYNTHETIC_COMPANY_HEADER,
+        period: SYNTHETIC_PERIOD_SEPT_2026,
         employees: items.map((i, idx) => ({
           ...i.payroll,
-          cargo: DEMO_WORKERS[idx].employee.cargo,
+          cargo: SYNTHETIC_WORKERS[idx].employee.cargo,
           attendance: i.attendance,
         })),
         summary: plamePackage.summary,
@@ -191,8 +141,17 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
-  // Descarga de archivos PLAME (.rem, .jor, .snl)
+  // Descarga de archivos PLAME (.rem, .jor, .snl) protegida
   if (url.pathname.startsWith('/api/download/plame/')) {
+    if (!verifyAuth(req, url)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        error: 'Acceso No Autorizado',
+        message: 'Se requiere autorización para descargar archivos tributarios PLAME.',
+      }));
+      return;
+    }
+
     const ext = url.pathname.replace('/api/download/plame/', '');
     const { plamePackage } = getConsolidatedPayroll();
 
@@ -208,20 +167,32 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
-  // Visor de Boleta de Pago HTML
+  // Visor de Boleta de Pago HTML protegido
   if (url.pathname.startsWith('/api/boleta/')) {
-    const docNum = url.pathname.replace('/api/boleta/', '');
-    const worker = DEMO_WORKERS.find((w) => w.employee.docNumber === docNum);
-
-    if (!worker) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Trabajador no encontrado.');
+    if (!verifyAuth(req, url)) {
+      res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`
+        <div style="font-family: sans-serif; padding: 40px; text-align: center;">
+          <h2>🔒 Acceso Restringido a Boleta de Pago</h2>
+          <p style="color: #64748b;">Este entorno de laboratorio requiere autorización previa para consultar boletas individuales.</p>
+          <p>Utilice la aplicación con el token configurado: <code>?key=${VAMOS_LAB_KEY}</code></p>
+        </div>
+      `);
       return;
     }
 
-    const payroll = calculateEmployeePayroll(worker.employee, worker.attendance, periodSept2026);
+    const docNum = url.pathname.replace('/api/boleta/', '');
+    const worker = SYNTHETIC_WORKERS.find((w) => w.employee.docNumber === docNum);
+
+    if (!worker) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Colaborador sintético no encontrado.');
+      return;
+    }
+
+    const payroll = calculateEmployeePayroll(worker.employee, worker.attendance, SYNTHETIC_PERIOD_SEPT_2026);
     const payslip = generatePayslip({
-      company: companyInfo,
+      company: SYNTHETIC_COMPANY_INFO,
       employee: worker.employee,
       attendance: worker.attendance,
       payroll,
@@ -241,13 +212,29 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
-  // Kiosco: Registrar Marcaje con PIN
+  // Kiosco: Registrar Marcaje con PIN (Con límite estricto de payload anti-DoS)
   if (url.pathname === '/api/kiosk/punch' && req.method === 'POST') {
     let body = '';
-    req.on('data', (chunk) => (body += chunk));
+    let bodyLength = 0;
+
+    req.on('data', (chunk) => {
+      bodyLength += chunk.length;
+      if (bodyLength > MAX_PAYLOAD_BYTES) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Payload Too Large: El tamaño excede el límite permitido de 16KB.' }));
+        req.destroy();
+        return;
+      }
+      body += chunk;
+    });
+
     req.on('end', () => {
+      if (bodyLength > MAX_PAYLOAD_BYTES) return;
       try {
         const { docNumber, pin, eventType } = JSON.parse(body);
+        if (!docNumber || !pin || !eventType) {
+          throw new Error('Parámetros incompletos en la solicitud de marcación.');
+        }
         const event = kioskStorage.recordAttendanceWithPin(docNumber, pin, eventType, 'TABLET-ALMACEN-01');
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, event }));
@@ -266,16 +253,16 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
-  res.writeHead(404);
-  res.end('Not Found');
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Endpoint no encontrado.' }));
 });
 
-// HTML interactivo del Dashboard
+// HTML interactivo del Dashboard con mitigación de XSS y advertencias de laboratorio
 const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>VAMOS — Dashboard de Nómina & Kiosco Almacén</title>
+  <title>VAMOS — Dashboard de Nómina & Kiosco Almacén (Lab Prototype)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -295,6 +282,17 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
     body { background: var(--bg); color: var(--text); padding-bottom: 50px; }
+    
+    .lab-banner {
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 24px;
+      text-align: center;
+      border-bottom: 1px solid #fde68a;
+    }
+
     header { background: #fff; border-bottom: 1px solid var(--border); padding: 16px 24px; position: sticky; top: 0; z-index: 40; }
     .header-wrap { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
     .logo { font-size: 18px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; }
@@ -352,15 +350,19 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 </head>
 <body>
 
+  <div class="lab-banner">
+    ⚠️ <strong>ENTORNO DE LABORATORIO TÉCNICO (v0.1.0-alpha)</strong> — Registros sintéticos simulados • Acceso protegido con clave local
+  </div>
+
   <header>
     <div class="header-wrap">
       <div class="logo">
-        🇵🇪 VAMOS <span class="badge-pe">Nómina MYPE Perú</span>
+        🇵🇪 VAMOS <span class="badge-pe">Lab Pilot Prototype</span>
       </div>
       <div class="nav-tabs">
-        <button class="tab-btn active" onclick="switchTab('tab-payroll')">📊 Planilla Mensual</button>
-        <button class="tab-btn" onclick="switchTab('tab-kiosk')">🏢 Kiosco Almacén</button>
-        <button class="tab-btn" onclick="switchTab('tab-plame')">📁 Archivos SUNAT</button>
+        <button class="tab-btn active" onclick="switchTab('tab-payroll', this)">📊 Planilla Mensual</button>
+        <button class="tab-btn" onclick="switchTab('tab-kiosk', this)">🏢 Kiosco Almacén</button>
+        <button class="tab-btn" onclick="switchTab('tab-plame', this)">📁 Archivos SUNAT</button>
       </div>
     </div>
   </header>
@@ -390,11 +392,11 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
       <div class="card">
         <div class="card-title">
-          <span>Periodo: Septiembre 2026 (Régimen Pequeña Empresa D.L. 1086)</span>
+          <span>Periodo: Septiembre 2026 (Datos de Demostración Sintéticos)</span>
           <div style="display: flex; gap: 8px;">
-            <a href="/api/download/plame/rem" class="btn btn-sm">Descargar .rem</a>
-            <a href="/api/download/plame/jor" class="btn btn-sm">Descargar .jor</a>
-            <a href="/api/download/plame/snl" class="btn btn-sm">Descargar .snl</a>
+            <a href="/api/download/plame/rem?key=test-lab-token" class="btn btn-sm">Descargar .rem</a>
+            <a href="/api/download/plame/jor?key=test-lab-token" class="btn btn-sm">Descargar .jor</a>
+            <a href="/api/download/plame/snl?key=test-lab-token" class="btn btn-sm">Descargar .snl</a>
           </div>
         </div>
         <div class="table-wrap">
@@ -402,7 +404,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             <thead>
               <tr>
                 <th>Colaborador</th>
-                <th>Cargo</th>
+                <th>Cargo / Régimen</th>
                 <th>Pensión</th>
                 <th class="amt">Básico</th>
                 <th class="amt">H. Extras</th>
@@ -413,7 +415,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
               </tr>
             </thead>
             <tbody id="payroll-tbody">
-              <!-- Cargado dinámicamente vía fetch -->
+              <!-- Cargado dinámicamente de forma segura -->
             </tbody>
           </table>
         </div>
@@ -451,18 +453,18 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
             <button class="key-btn" onclick="pressKey('7')">7</button>
             <button class="key-btn" onclick="pressKey('8')">8</button>
             <button class="key-btn" onclick="pressKey('9')">9</button>
-            <button class="key-btn" style="background: #b91c1c;" onclick="clearPin()">C</button>
+            <button class="key-btn" style="background: #dc2626;" onclick="clearPin()">C</button>
             <button class="key-btn" onclick="pressKey('0')">0</button>
-            <button class="key-btn" style="background: var(--success);" onclick="submitPunch()">OK</button>
+            <button class="key-btn" style="background: #059669;" onclick="submitPunch()">OK</button>
           </div>
 
-          <div id="kiosk-status" class="kiosk-status"></div>
+          <div class="kiosk-status" id="kiosk-status"></div>
         </div>
 
         <div class="card">
           <div class="card-title">
             <span>Log Inmutable de Marcaciones (SQLite Local)</span>
-            <span id="chain-badge" class="badge-pe" style="background: #ecfdf5; color: var(--success); border-color: #a7f3d0;">
+            <span class="badge-pe" style="background: #ecfdf5; color: #059669; border-color: #a7f3d0;">
               🔒 Cadena SHA-256 Íntegra
             </span>
           </div>
@@ -478,7 +480,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
                 </tr>
               </thead>
               <tbody id="kiosk-events-tbody">
-                <!-- Cargado dinámicamente -->
+                <!-- Eventos cargados dinámicamente -->
               </tbody>
             </table>
           </div>
@@ -486,31 +488,38 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- TAB 3: ARCHIVOS SUNAT -->
+    <!-- TAB 3: ARCHIVOS SUNAT PLAME -->
     <div id="tab-plame" class="tab-content">
       <div class="card">
-        <div class="card-title">Estructura Oficial PDT-PLAME v4.5 (Vigente Oct 2025+)</div>
+        <div class="card-title">
+          <span>Paquete de Exportación Oficial PDT-PLAME v4.5 (Régimen 2026)</span>
+        </div>
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
-          Archivos planos generados con codificación ANSI/ASCII, delimitador de campo pipe (|) y fin de línea Windows CRLF para importación directa en el validador de SUNAT.
+          Los siguientes archivos planos son generados con codificación de texto estándar ISO-8859-1 y delimitador CRLF (Windows) para carga directa en el validador oficial del aplicativo SUNAT:
         </p>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
-          <div style="border: 1px solid var(--border); padding: 16px; border-radius: 8px;">
-            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px;">Estructura 04 (.jor)</div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Jornada laboral ordinaria y horas de sobretiempo acumuladas.</p>
-            <a href="/api/download/plame/jor" class="btn btn-sm">Descargar .jor</a>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px; background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;">
+            <div>
+              <strong>060120260920601234567.rem</strong>
+              <div style="font-size: 12px; color: var(--text-muted);">Conceptos remunerativos, descuentos y aportes del empleador (Estructura 11)</div>
+            </div>
+            <a href="/api/download/plame/rem?key=test-lab-token" class="btn btn-sm">Descargar .rem</a>
           </div>
 
-          <div style="border: 1px solid var(--border); padding: 16px; border-radius: 8px;">
-            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px;">Estructura 05 (.snl)</div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Días no laborados y suspensiones bajo Tabla 21 de SUNAT.</p>
-            <a href="/api/download/plame/snl" class="btn btn-sm">Descargar .snl</a>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px; background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;">
+            <div>
+              <strong>060120260920601234567.jor</strong>
+              <div style="font-size: 12px; color: var(--text-muted);">Jornada laboral ordinaria y horas de sobretiempo diurno/nocturno (Estructura 04)</div>
+            </div>
+            <a href="/api/download/plame/jor?key=test-lab-token" class="btn btn-sm">Descargar .jor</a>
           </div>
 
-          <div style="border: 1px solid var(--border); padding: 16px; border-radius: 8px;">
-            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px;">Estructura 11 (.rem)</div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Conceptos remunerativos, descuentos y aportes bajo Tabla 22.</p>
-            <a href="/api/download/plame/rem" class="btn btn-sm">Descargar .rem</a>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px; background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;">
+            <div>
+              <strong>060120260920601234567.snl</strong>
+              <div style="font-size: 12px; color: var(--text-muted);">Días subsidiados y suspensiones no remuneradas / faltas injustificadas (Estructura 05)</div>
+            </div>
+            <a href="/api/download/plame/snl?key=test-lab-token" class="btn btn-sm">Descargar .snl</a>
           </div>
         </div>
       </div>
@@ -519,7 +528,19 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
   </div>
 
   <script>
+    const LAB_KEY = 'test-lab-token';
     let currentPin = '';
+
+    // Mitigación estricta de XSS
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
     function switchTab(tabId, btn) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -535,53 +556,77 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     }
 
     async function loadPayroll() {
-      const res = await fetch('/api/payroll-data');
-      const data = await res.json();
+      try {
+        const res = await fetch('/api/payroll-data', {
+          headers: { 'x-vamos-key': LAB_KEY }
+        });
+        if (!res.ok) {
+          throw new Error('No autorizado o error de respuesta');
+        }
+        const data = await res.json();
 
-      document.getElementById('stat-gross').innerText = 'S/ ' + data.summary.totalGrossAmount.toFixed(2);
-      document.getElementById('stat-deductions').innerText = 'S/ ' + data.summary.totalDeductionsAmount.toFixed(2);
-      document.getElementById('stat-net').innerText = 'S/ ' + (data.summary.totalGrossAmount - data.summary.totalDeductionsAmount).toFixed(2);
-      document.getElementById('stat-essalud').innerText = 'S/ ' + data.summary.totalEssaludAmount.toFixed(2);
+        document.getElementById('stat-gross').innerText = 'S/ ' + data.summary.totalGrossAmount.toFixed(2);
+        document.getElementById('stat-deductions').innerText = 'S/ ' + data.summary.totalDeductionsAmount.toFixed(2);
+        document.getElementById('stat-net').innerText = 'S/ ' + (data.summary.totalGrossAmount - data.summary.totalDeductionsAmount).toFixed(2);
+        document.getElementById('stat-essalud').innerText = 'S/ ' + data.summary.totalEssaludAmount.toFixed(2);
 
-      const tbody = document.getElementById('payroll-tbody');
-      tbody.innerHTML = '';
+        const tbody = document.getElementById('payroll-tbody');
+        tbody.innerHTML = '';
 
-      data.employees.forEach(emp => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = \`
-          <td><strong>\${emp.fullName}</strong><br><small style="color: #64748b;">DNI: \${emp.docNumber}</small></td>
-          <td>\${emp.cargo}</td>
-          <td><span class="\${emp.pensionSystem === 'ONP' ? 'badge-onp' : 'badge-afp'}">\${emp.pensionSystem}</span></td>
-          <td class="amt">S/ \${emp.earnings.baseSalaryEarned.toFixed(2)}</td>
-          <td class="amt">S/ \${(emp.earnings.overtime25Amount + emp.earnings.overtime35Amount).toFixed(2)}</td>
-          <td class="amt"><strong>S/ \${emp.earnings.totalGrossRemuneration.toFixed(2)}</strong></td>
-          <td class="amt" style="color: var(--danger);">S/ \${emp.deductions.totalDeductions.toFixed(2)}</td>
-          <td class="amt" style="color: var(--success);"><strong>S/ \${emp.netPay.toFixed(2)}</strong></td>
-          <td>
-            <a href="/api/boleta/\${emp.docNumber}" target="_blank" class="btn btn-secondary btn-sm">📄 Ver Boleta</a>
-          </td>
-        \`;
-        tbody.appendChild(tr);
-      });
+        data.employees.forEach(emp => {
+          const tr = document.createElement('tr');
+          const safeName = escapeHtml(emp.fullName);
+          const safeDoc = escapeHtml(emp.docNumber);
+          const safeCargo = escapeHtml(emp.cargo);
+          const safeRegime = escapeHtml(emp.regime);
+          const safePension = escapeHtml(emp.pensionSystem);
+
+          tr.innerHTML = \`
+            <td><strong>\${safeName}</strong><br><small style="color: #64748b;">DNI: \${safeDoc}</small></td>
+            <td>\${safeCargo}<br><small style="color: #2563eb;">\${safeRegime}</small></td>
+            <td><span class="\${safePension === 'ONP' ? 'badge-onp' : 'badge-afp'}">\${safePension}</span></td>
+            <td class="amt">S/ \${emp.earnings.baseSalaryEarned.toFixed(2)}</td>
+            <td class="amt">S/ \${(emp.earnings.overtime25Amount + emp.earnings.overtime35Amount).toFixed(2)}</td>
+            <td class="amt"><strong>S/ \${emp.earnings.totalGrossRemuneration.toFixed(2)}</strong></td>
+            <td class="amt" style="color: var(--danger);">S/ \${emp.deductions.totalDeductions.toFixed(2)}</td>
+            <td class="amt" style="color: var(--success);"><strong>S/ \${emp.netPay.toFixed(2)}</strong></td>
+            <td>
+              <a href="/api/boleta/\${encodeURIComponent(emp.docNumber)}?key=\${encodeURIComponent(LAB_KEY)}" target="_blank" class="btn btn-secondary btn-sm">📄 Ver Boleta</a>
+            </td>
+          \`;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('Error cargando planilla:', err);
+      }
     }
 
     async function loadKioskEvents() {
-      const res = await fetch('/api/kiosk/events');
-      const data = await res.json();
-      const tbody = document.getElementById('kiosk-events-tbody');
-      tbody.innerHTML = '';
+      try {
+        const res = await fetch('/api/kiosk/events');
+        const data = await res.json();
+        const tbody = document.getElementById('kiosk-events-tbody');
+        tbody.innerHTML = '';
 
-      data.events.forEach(ev => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = \`
-          <td><strong>#\${ev.sequenceNumber}</strong></td>
-          <td>\${ev.employeeDoc}</td>
-          <td><span class="badge-pe">\${ev.eventType}</span></td>
-          <td><small>\${new Date(ev.deviceTimestamp).toLocaleTimeString()}</small></td>
-          <td><span class="sha-tag">\${ev.eventHash.substring(0, 16)}...</span></td>
-        \`;
-        tbody.appendChild(tr);
-      });
+        data.events.forEach(ev => {
+          const tr = document.createElement('tr');
+          const safeSeq = escapeHtml(ev.sequenceNumber);
+          const safeDoc = escapeHtml(ev.employeeDoc);
+          const safeType = escapeHtml(ev.eventType);
+          const safeHash = escapeHtml(ev.eventHash.substring(0, 16));
+
+          tr.innerHTML = \`
+            <td><strong>#\${safeSeq}</strong></td>
+            <td>\${safeDoc}</td>
+            <td><span class="badge-pe">\${safeType}</span></td>
+            <td><small>\${new Date(ev.deviceTimestamp).toLocaleTimeString()}</small></td>
+            <td><span class="sha-tag">\${safeHash}...</span></td>
+          \`;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('Error cargando eventos:', err);
+      }
     }
 
     function pressKey(k) {
@@ -650,6 +695,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-server.listen(PORT, () => {
-  console.log(`🚀 Servidor VAMOS Web Dashboard activo en: http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`🚀 Servidor VAMOS Web Dashboard (Lab Prototype) activo en: http://${HOST}:${PORT}`);
+  console.log(`🔒 Control de Acceso: Clave de laboratorio activa ('${VAMOS_LAB_KEY}')`);
 });

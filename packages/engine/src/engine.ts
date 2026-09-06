@@ -3,7 +3,7 @@
  * Orchestrates legal rules for Small Business (D.L. 1086) and General Regime (D.L. 728)
  */
 
-import { DEFAULT_LEGAL_PARAMETERS_PERU, type LegalParameters, roundSunat } from './parameters.ts';
+import { DEFAULT_LEGAL_PARAMETERS_PERU, getParameterSetForPeriod, type LegalParameters, roundSunat } from './parameters.ts';
 import { calculateEmployerContributions } from './rules/employer.ts';
 import { calculateOvertimeAndNight } from './rules/overtime.ts';
 import { calculatePensionDeductions } from './rules/pension.ts';
@@ -29,7 +29,7 @@ export function calculateEmployeePayroll(
   period: PayrollPeriod,
   options: PayrollEngineOptions = {}
 ): PayrollSlipResult {
-  const params = options.legalParameters ?? DEFAULT_LEGAL_PARAMETERS_PERU;
+  const params = options.legalParameters ?? getParameterSetForPeriod(period.year, period.month);
   const masterAuditTrail: AuditLogEntry[] = [];
 
   // 1. Cálculo de base, asignación familiar y deducciones de asistencia inicial

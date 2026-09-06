@@ -5,7 +5,7 @@ import type { AttendanceSummary, Employee, PayrollPeriod } from '../../engine/sr
 import { compilePlamePackage } from '../src/compiler.ts';
 import type { CompanyHeader, EmployeePayrollItem } from '../src/types.ts';
 
-describe('PDT-PLAME v4.5 Compiler (@payroll/plame-compiler) - Official SUNAT Test Suite', () => {
+describe('PDT-PLAME v4.5 Compiler (@payroll/plame-compiler) - Suite Interna de Estructuras Planas', () => {
   const testCompany: CompanyHeader = {
     ruc: '20601234567',
     razonSocial: 'DISTRIBUIDORA LIMA NORTE S.A.C.',

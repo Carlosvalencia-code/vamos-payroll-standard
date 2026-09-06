@@ -6,7 +6,7 @@ import { generatePayslip } from '../src/generator.ts';
 import type { CompanyInfo, EmployeeJobInfo } from '../src/types.ts';
 import { convertirNumeroALetrasSoles } from '../src/utils/numberToWords.ts';
 
-describe('Peruvian Payslip Generator (@payroll/payslip-pdf) - MTPE Legal Compliance Suite', () => {
+describe('Peruvian Payslip Generator (@payroll/payslip-pdf) - Suite Interna de Formato de Boletas A4', () => {
   const testCompany: CompanyInfo = {
     ruc: '20601234567',
     razonSocial: 'LOGISTICA & DISTRIBUCION URBANA S.A.C.',

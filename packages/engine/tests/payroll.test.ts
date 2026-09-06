@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { calculateEmployeePayroll } from '../src/engine.ts';
-import { DEFAULT_LEGAL_PARAMETERS_PERU } from '../src/parameters.ts';
+import { DEFAULT_LEGAL_PARAMETERS_PERU, getParameterSetForPeriod } from '../src/parameters.ts';
+import { calculateGratification, calculateCts, getLegalVacationDays } from '../src/rules/benefits.ts';
 import type { AttendanceSummary, Employee, PayrollPeriod } from '../src/types.ts';
 
-describe('Peruvian Payroll Engine (@payroll/engine) - Legal Validation Suite', () => {
+describe('Peruvian Payroll Engine (@payroll/engine) - Suite Interna de Regresión Laboral', () => {
   const periodSept2026: PayrollPeriod = {
     year: 2026,
     month: 9,
@@ -303,5 +304,68 @@ describe('Peruvian Payroll Engine (@payroll/engine) - Legal Validation Suite', (
 
     const calculatedNet = Math.round((result.earnings.totalGrossRemuneration - result.deductions.totalDeductions) * 100) / 100;
     assert.equal(result.netPay, calculatedNet, 'El sueldo neto debe ser exactamente la diferencia matemática');
+  });
+
+  it('Caso 11: Diferenciación Estricta de Beneficios: Microempresa (0 Grati, 0 CTS) vs Pequeña Empresa (50%) vs Régimen General (100%)', () => {
+    const baseSalary = 2000.00;
+    const familyAllowance = 102.50; // Total computable = 2102.50
+    const monthsWorked = 6; // Semestre completo
+
+    // 1. Microempresa (Art. 48 D.S. 007-2008-TR)
+    const gratiMicro = calculateGratification(baseSalary, familyAllowance, monthsWorked, 'MICRO_EMPRESA');
+    assert.equal(gratiMicro.gratificationAmount, 0, 'Microempresa debe tener S/ 0 de gratificación');
+    assert.equal(gratiMicro.extraordinaryBonus9Percent, 0);
+    assert.equal(gratiMicro.totalPayable, 0);
+    assert.equal(gratiMicro.isEligible, false);
+
+    const ctsMicro = calculateCts(baseSalary, familyAllowance, monthsWorked, 'MICRO_EMPRESA');
+    assert.equal(ctsMicro.ctsAmount, 0, 'Microempresa debe tener S/ 0 de CTS');
+    assert.equal(ctsMicro.isEligible, false);
+    assert.equal(getLegalVacationDays('MICRO_EMPRESA'), 15);
+
+    // 2. Pequeña Empresa (D.S. 008-2008-TR)
+    const gratiSmall = calculateGratification(baseSalary, familyAllowance, monthsWorked, 'PEQUENA_EMPRESA');
+    // 50% de 2102.50 = 1051.25. Bono 9% = 94.61. Total = 1145.86
+    assert.equal(gratiSmall.gratificationAmount, 1051.25);
+    assert.equal(gratiSmall.extraordinaryBonus9Percent, 94.61);
+    assert.equal(gratiSmall.totalPayable, 1145.86);
+    assert.equal(gratiSmall.isEligible, true);
+
+    const ctsSmall = calculateCts(baseSalary, familyAllowance, monthsWorked, 'PEQUENA_EMPRESA');
+    // (2102.50 * 0.50) / 12 * 6 = 525.63
+    assert.equal(ctsSmall.ctsAmount, 525.63);
+    assert.equal(getLegalVacationDays('PEQUENA_EMPRESA'), 15);
+
+    // 3. Régimen General (Ley 27735 / D.L. 650)
+    const gratiGeneral = calculateGratification(baseSalary, familyAllowance, monthsWorked, 'REGIMEN_GENERAL');
+    assert.equal(gratiGeneral.gratificationAmount, 2102.50);
+    assert.equal(gratiGeneral.extraordinaryBonus9Percent, 189.23);
+    assert.equal(gratiGeneral.totalPayable, 2291.73);
+
+    const ctsGeneral = calculateCts(baseSalary, familyAllowance, monthsWorked, 'REGIMEN_GENERAL');
+    // Computable: 2102.50 + (2102.50 / 6 = 350.42) = 2452.92. Semestre: 2452.92 / 12 * 6 = 1226.46
+    assert.equal(ctsGeneral.ctsAmount, 1226.46);
+    assert.equal(getLegalVacationDays('REGIMEN_GENERAL'), 30);
+  });
+
+  it('Caso 12: Control Normativo de Parámetros Versionados y Citas Legales', () => {
+    const params = getParameterSetForPeriod(2026, 9);
+    assert.equal(params.rmv, 1025.00);
+    assert.equal(params.uit, 5350.00);
+    assert.ok(params.legalReferences.length >= 7, 'Debe incluir citas de leyes expresas');
+
+    const rmvRef = params.legalReferences.find((r) => r.concept.includes('RMV'));
+    assert.ok(rmvRef?.sourceLaw.includes('003-2022-TR'), 'Debe citar el D.S. 003-2022-TR para la RMV');
+
+    const uitRef = params.legalReferences.find((r) => r.concept.includes('UIT'));
+    assert.ok(uitRef?.sourceLaw.includes('272-2024-EF'), 'Debe citar el D.S. 272-2024-EF para la UIT');
+  });
+
+  it('Caso 13: Excepción ante Periodo No Registrado (Blindaje de Cálculos Antiguos)', () => {
+    // Intentar calcular para un año sin parámetros registrados (ej. 2018) debe arrojar error controlado
+    assert.throws(
+      () => getParameterSetForPeriod(2018, 5),
+      /VAMOS Compliance Guard/
+    );
   });
 });

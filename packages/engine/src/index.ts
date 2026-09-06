@@ -6,3 +6,4 @@ export * from './rules/overtime.ts';
 export * from './rules/pension.ts';
 export * from './rules/smallBusiness.ts';
 export * from './rules/taxes.ts';
+export * from './rules/benefits.ts';

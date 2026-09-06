@@ -3,11 +3,44 @@
  * Standards: SUNAT (PDT-PLAME v4.5), D.L. 1086 (REMYPE), D.L. 728
  */
 
-export type LaborRegime = 'PEQUENA_EMPRESA' | 'REGIMEN_GENERAL' | 'MICROEMPRESA';
+export type LaborRegime = 'MICRO_EMPRESA' | 'PEQUENA_EMPRESA' | 'REGIMEN_GENERAL' | 'MICROEMPRESA';
 
 export type PensionSystem = 'ONP' | 'INTEGRA' | 'PRIMA' | 'PROFUTURO' | 'HABITAT';
 
 export type CommissionType = 'FLUJO' | 'MIXTA';
+
+export interface ParameterLegalReference {
+  concept: string;
+  value: number | string;
+  sourceLaw: string;
+  officialGazetteDate?: string;
+}
+
+export interface AfpRateEntry {
+  mandatoryFundRate: number; // 0.10 (10%)
+  insurancePremiumRate: number; // Tasa SIS SBS
+  commissionFlowRate: number; // Comisión sobre flujo
+  commissionMixedRate: number; // Comisión mixta sobre saldo/flujo
+  maxInsurableRemuneration: number; // Tope asegurable
+}
+
+export interface ParameterSet {
+  period: string; // ej. "2026-09"
+  year: number;
+  month: number;
+  rmv: number;
+  uit: number;
+  familyAllowanceRate: number;
+  essaludRate: number;
+  onpRate: number;
+  monthlyLaborHours: number;
+  monthlyLaborDays: number;
+  overtimeFirstTwoHoursRate: number;
+  overtimeRemainingHoursRate: number;
+  nightSurchargeRate: number;
+  afpRates: Record<'INTEGRA' | 'PRIMA' | 'PROFUTURO' | 'HABITAT', AfpRateEntry>;
+  legalReferences: ParameterLegalReference[];
+}
 
 export type PayrollLifecycleState =
   | 'BORRADOR'

@@ -4,7 +4,7 @@ import { GENESIS_HASH, verifyChainIntegrity } from '../src/security/hashChain.ts
 import { PinRateLimiter } from '../src/security/rateLimiter.ts';
 import { KioskStorage } from '../src/storage/kioskStorage.ts';
 
-describe('Offline-First Attendance Core (@payroll/attendance-core) - Kiosk Test Suite', () => {
+describe('Offline-First Attendance Core (@payroll/attendance-core) - Suite de Integridad y Detección de Alteraciones', () => {
   let storage: KioskStorage;
   const testDeviceId = 'TABLET-ALMACEN-01';
 

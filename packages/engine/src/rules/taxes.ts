@@ -24,10 +24,12 @@ export function calculateFifthCategoryTax(
   const auditEntries: AuditLogEntry[] = [];
 
   let projectedGratifications = 0;
-  if (regime === 'PEQUENA_EMPRESA') {
-    projectedGratifications = roundSunat(monthlyGrossRemuneration * 1.09);
+  if (regime === 'MICRO_EMPRESA' || regime === 'MICROEMPRESA') {
+    projectedGratifications = 0; // Art. 48 D.S. 007-2008-TR: Microempresa no tiene gratificaciones legales
+  } else if (regime === 'PEQUENA_EMPRESA') {
+    projectedGratifications = roundSunat(monthlyGrossRemuneration * 1.09); // 2 medias gratificaciones (1 sueldo + 9% bono extraordinario Ley 30334)
   } else if (regime === 'REGIMEN_GENERAL') {
-    projectedGratifications = roundSunat(monthlyGrossRemuneration * 2 * 1.09);
+    projectedGratifications = roundSunat(monthlyGrossRemuneration * 2 * 1.09); // 2 sueldos completos + 9% bono extraordinario
   }
 
   const projectedAnnualGross = roundSunat((monthlyGrossRemuneration * 12) + projectedGratifications);
