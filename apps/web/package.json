@@ -1,0 +1,19 @@
+{
+  "name": "@payroll/web",
+  "version": "0.1.0",
+  "description": "Dashboard Web para Contador y Terminal de Kiosco Operativo",
+  "main": "src/server.ts",
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types src/server.ts",
+    "dev": "node --experimental-strip-types src/server.ts"
+  },
+  "dependencies": {
+    "@payroll/engine": "*",
+    "@payroll/plame-compiler": "*",
+    "@payroll/attendance-core": "*",
+    "@payroll/payslip-pdf": "*"
+  },
+  "author": "VAMOS Core Team",
+  "license": "AGPL-3.0-only"
+}
