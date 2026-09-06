@@ -1,0 +1,20 @@
+{
+  "name": "@payroll/payslip-pdf",
+  "version": "0.1.0",
+  "description": "Generador de Boletas de Pago formales en PDF/HTML según D.S. 001-98-TR y D.S. 009-2011-TR del MTPE Perú",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --experimental-strip-types tests/**/*.test.ts"
+  },
+  "keywords": [
+    "payslip",
+    "boleta-de-pago",
+    "peru",
+    "mtpe",
+    "sunafil",
+    "pdf"
+  ],
+  "author": "VAMOS Core Team",
+  "license": "AGPL-3.0-only"
+}

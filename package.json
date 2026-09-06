@@ -8,10 +8,11 @@
     "apps/*"
   ],
   "scripts": {
-    "test": "node --test --experimental-strip-types packages/engine/tests/payroll.test.ts packages/plame-compiler/tests/plame.test.ts packages/attendance-core/tests/attendance.test.ts",
+    "test": "node --test --experimental-strip-types packages/engine/tests/payroll.test.ts packages/plame-compiler/tests/plame.test.ts packages/attendance-core/tests/attendance.test.ts packages/payslip-pdf/tests/payslip.test.ts",
     "test:engine": "node --test --experimental-strip-types packages/engine/tests/payroll.test.ts",
     "test:plame": "node --test --experimental-strip-types packages/plame-compiler/tests/plame.test.ts",
-    "test:attendance": "node --test --experimental-strip-types packages/attendance-core/tests/attendance.test.ts"
+    "test:attendance": "node --test --experimental-strip-types packages/attendance-core/tests/attendance.test.ts",
+    "test:payslip": "node --test --experimental-strip-types packages/payslip-pdf/tests/payslip.test.ts"
   },
   "keywords": [
     "payroll",
@@ -20,6 +21,8 @@
     "plame",
     "attendance",
     "kiosk",
+    "payslip",
+    "boleta-de-pago",
     "sqlite",
     "open-core"
   ],
