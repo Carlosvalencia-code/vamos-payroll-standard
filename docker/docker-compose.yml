@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  vamos-web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: vamos-payroll-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production

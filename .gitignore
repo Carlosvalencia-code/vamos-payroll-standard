@@ -1,3 +1,4 @@
+# Dependencies & build
 node_modules/
 dist/
 .DS_Store
@@ -5,3 +6,29 @@ dist/
 .env
 .env.local
 .env.*.local
+
+# Internal personal & client research files
+*.pdf
+*.txt
+*.tex
+WhatsApp*
+.agents/
+01_branding/
+03_contenido/
+04_sistema_chat/
+05_ventas_y_clientes/
+06_procesos_internos/
+New folder/
+odysseus/
+landing_page_validacion.html
+
+# Root loose draft markdown files (canonical versions are in docs/)
+00_*.md
+01_*.md
+03_*.md
+04_*.md
+07_*.md
+payroll_saas_v2_execution_roadmap.md
+regulatory_technical_register.md
+*Stress*
+*hubert*
