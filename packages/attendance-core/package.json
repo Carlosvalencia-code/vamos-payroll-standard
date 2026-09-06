@@ -1,0 +1,21 @@
+{
+  "name": "@payroll/attendance-core",
+  "version": "0.1.0",
+  "description": "Módulo de asistencia operativa offline-first para Kiosco tablet y App choferes con SQLite local, encadenamiento criptográfico SHA-256 y rate-limiting de PIN",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --experimental-strip-types tests/**/*.test.ts"
+  },
+  "keywords": [
+    "attendance",
+    "kiosk",
+    "sqlite",
+    "offline-first",
+    "tamper-evident",
+    "mtpe",
+    "sunafil"
+  ],
+  "author": "VAMOS Core Team",
+  "license": "AGPL-3.0-only"
+}
